@@ -1,0 +1,15 @@
+### Eclipse ###
+.metadata
+.settings/
+bin/
+.project
+.classpath
+
+### Documentum ###
+apptoken/
+data-dir/
+documentum/
+log/*
+!log/.gitkeep
+!lib
+!lib/documentum/
