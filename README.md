@@ -3,6 +3,7 @@
 This is a java-based documentum quick doc extractor
 
 This doesn't use the getFile API that sometimees can be very slow
+
 Instead it takes the dmr_content information related to the document and directly transfer the file from the docbase to the desired destination folder
 
 # Pre-reqs
