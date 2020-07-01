@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -38,6 +37,7 @@ import net.cirou.tool.beans.RenditionData;
 
 public class DocumentExtractor {
 
+	private static final String PATH_DELIMITER = "\\";
 	IDfSysObject sysObject = null;
 	IDfSession idfSession = null;
 	IDfSessionManager sessMgr = null;
@@ -52,8 +52,6 @@ public class DocumentExtractor {
 
 	static String inputFile = "";
 	static String outputPath = "";
-	static String docIdQuery = "";
-	static String docFileQuery = "";
 
 	static String username = "";
 	static String password = "";
@@ -84,75 +82,30 @@ public class DocumentExtractor {
 	public static void loadProperties() {
 
 		try (InputStream input = new FileInputStream(".\\conf\\extractor.properties")) {
+
 			prop.load(input);
 
-			if (prop.get("extractor.file.output.path") != null) {
-				outputPath = (String) prop.get("extractor.file.output.path");
-			} else {
-				logger.error("Missing \"extractor.file.output.path\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.file.input") != null) {
-				inputFile = (String) prop.get("extractor.file.input");
-			} else {
-				logger.error("Missing \"extractor.file.input\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.document.id.query") != null) {
-				docIdQuery = (String) prop.get("extractor.document.id.query");
-			} else {
-				logger.error("Missing \"extractor.document.id.query\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.docbase.username") != null) {
-				username = (String) prop.get("extractor.docbase.username");
-			} else {
-				logger.error("Missing \"extractor.docbase.username\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.docbase.password") != null) {
-				password = (String) prop.get("extractor.docbase.password");
-			} else {
-				logger.error("Missing \"extractor.docbase.password\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.docbase.name") != null) {
-				docbase = (String) prop.get("extractor.docbase.name");
-			} else {
-				logger.error("Missing \"extractor.docbase.name\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.document.file.query") != null) {
-				docFileQuery = (String) prop.get("extractor.document.file.query");
-			} else {
-				logger.error("Missing \"extractor.document.file.query\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.document.doc.rendition.data.query") != null) {
-				renditionQuery = (String) prop.get("extractor.document.doc.rendition.data.query");
-			} else {
-				logger.error("Missing \"extractor.document.doc.rendition.data.query\" property");
-				throw new InternalError();
-			}
-
-			if (prop.get("extractor.docbase.id") != null) {
-				docbaseId = (String) prop.get("extractor.docbase.id");
-			} else {
-				logger.error("Missing \"extractor.docbase.id\" property");
-				throw new InternalError();
-			}
+			outputPath = getProperty("extractor.file.output.path");
+			inputFile = getProperty("extractor.file.input");
+			username = getProperty("extractor.docbase.username");
+			password = getProperty("extractor.docbase.password");
+			docbase = getProperty("extractor.docbase.name");
+			renditionQuery = getProperty("extractor.document.doc.rendition.data.query");
+			docbaseId = getProperty("extractor.docbase.id");
 
 		} catch (IOException e) {
 			logger.error(e.getMessage());
 		}
 
+	}
+
+	private static String getProperty(String property) throws InternalError {
+		if (prop.get(property) != null) {
+			return (String) prop.get(property);
+		} else {
+			logger.error("Missing " + property + " property");
+			throw new InternalError();
+		}
 	}
 
 	public DocumentExtractor(String user, String passwd, String docbase) throws DfServiceException {
@@ -202,21 +155,9 @@ public class DocumentExtractor {
 		for (DocumentObject doc : objectArray) {
 			IDfId id = new DfId(doc.getId());
 			IDfSysObject docObj = (IDfSysObject) idfSession.getObject(id);
-			
+
 			doc.setName(docObj.getObjectName().trim().replaceAll("[\\\\/:*?\"<>|]", " "));
 			doc.setTitle(docObj.getTitle());
-			doc.setDocNum(docObj.getString("spm_doc_num"));
-			doc.setDocType(docObj.getString("ecs_doc_type_name"));
-			doc.setFirstIssuedDate(docObj.getString("spm_first_issued_date"));
-			doc.setRevision(docObj.getString("spm_rev_code"));
-			doc.setRevisionStatus(docObj.getString("spm_rev_status"));
-			doc.setState(docObj.getString("ecs_lc_state"));
-			doc.setProject(docObj.getString("spm_project"));
-			doc.setCompanyProject(docObj.getString("spm_company_project"));
-			doc.setIssuingDept(docObj.getString("spm_issuing_dept"));
-			doc.setIssuingDesc(docObj.getString("spm_issuing_desc"));
-			doc.setManagingDept(docObj.getString("spm_managing_dept"));
-			doc.setDiscipline(docObj.getString("spm_discipline"));
 
 		}
 
@@ -257,52 +198,36 @@ public class DocumentExtractor {
 			String timestamp = new SimpleDateFormat("'\\documents\\'yyyyMMddHHmm'\\'").format(new Date());
 			new File(outputPath + timestamp).mkdirs();
 
-			String docReport = "";
+			StringBuilder docReport = new StringBuilder("");
 
 			for (DocumentObject doc : objectArray) {
 
-				docReport += 
-						
-						doc.getId() + ";" + 
-						doc.getName() + ";" + 
-						doc.getTitle() + ";" + 
-						doc.getDocNum() + ";" +
-						doc.getDocType() + ";" + 
-						doc.getProject() + ";" + 
-						doc.getState() + ";" +
-						doc.getRevision() + ";" + 
-						doc.getRevisionStatus() + ";" + 
-						
-						doc.getFirstIssuedDate() + ";"
-				
-						;
+				docReport.append(doc.getId() + ";" + doc.getName() + ";" + doc.getTitle() + ";");
 
-				ArrayList<RenditionData> rendList = doc.getRenditions();
+				ArrayList<RenditionData> rendList = (ArrayList<RenditionData>) doc.getRenditions();
 
 				for (RenditionData rendition : rendList) {
-
+					
 					String finalPath = getFilePathOnDocbase(rendition);
 
-					String filePath = rendition.getFileSystemPath() + "\\" + rendition.getDocbaseId() + "\\" + finalPath
-							+ "." + rendition.getExtension();
+					String filePath = rendition.getFileSystemPath() + PATH_DELIMITER + rendition.getDocbaseId() + PATH_DELIMITER + finalPath + "." + rendition.getExtension();
 
 					File afile = new File(filePath);
-					File bfile = new File(
-							outputPath + timestamp + "\\" + doc.getName() + "." + rendition.getExtension());
+					File bfile = new File(outputPath + timestamp + PATH_DELIMITER + doc.getName() + "." + rendition.getExtension());
 
 					bfile = checkIfFileExists(bfile, timestamp, doc.getName(), rendition.getExtension(), 1);
 
 					writeDocFile(afile, bfile);
 
 					expRend++;
-					docReport += doc.getName() + "." + rendition.getExtension() + ";";
+					docReport.append(doc.getName() + "." + rendition.getExtension() + ";");
 
 					System.out.println(doc.getName() + " copied successfully");
 
 				}
 
 				expDoc++;
-				docReport += "\n";
+				docReport.append("\n");
 
 			}
 
@@ -323,38 +248,62 @@ public class DocumentExtractor {
 		long dataTicket = Integer.parseInt(rendition.getDataTicket()) + 4294967296L;
 		String dataTicketPath = Long.toHexString(dataTicket);
 		String[] path = dataTicketPath.split("(?<=\\G.{2})");
-		String finalPath = String.join("\\", path);
-		return finalPath;
+		return String.join(PATH_DELIMITER, path);
 	}
 
-	private void writeDocFile(File afile, File bfile) throws FileNotFoundException, IOException {
+	private void writeDocFile(File afile, File bfile) throws IOException {
+		
 		InputStream inStream = null;
 		OutputStream outStream = null;
+		
+		try {
 
-		inStream = new FileInputStream(afile);
-		outStream = new FileOutputStream(bfile);
+			inStream = new FileInputStream(afile);
+			outStream = new FileOutputStream(bfile);
 
-		byte[] buffer = new byte[1024];
+			byte[] buffer = new byte[1024];
 
-		int length;
-		while ((length = inStream.read(buffer)) > 0) {
-			outStream.write(buffer, 0, length);
+			int length;
+			while ((length = inStream.read(buffer)) > 0) {
+				outStream.write(buffer, 0, length);
+			}
+
+		} finally {
+			
+			if (inStream != null) {
+				inStream.close();
+			}
+			
+			if (outStream != null) {
+				outStream.close();
+			}
 		}
-
-		inStream.close();
-		outStream.close();
 	}
 
-	private void writeReportFile(String timestamp, String docReport) throws IOException {
-		File reportFile = new File(outputPath + timestamp + "\\extraction_report.txt");
-		BufferedWriter writer = new BufferedWriter(new FileWriter(reportFile));
-		writer.write(docReport);
-		writer.close();
+	private void writeReportFile(String timestamp, StringBuilder docReport) throws IOException {
+
+		BufferedWriter writer = null;
+
+		try {
+			
+			File reportFile = new File(outputPath + timestamp + "\\extraction_report.txt");
+			writer = new BufferedWriter(new FileWriter(reportFile));
+			writer.write(docReport.toString());
+			writer.close();
+			
+		} finally {
+			
+			if (writer != null) {
+				writer.close();
+			}
+			
+		}
+
 	}
 
 	private File checkIfFileExists(File bfile, String timestamp, String name, String extension, int i) {
 		if (bfile.exists()) {
-			bfile = new File(outputPath + timestamp + "\\" + name + "_" + i + "." + extension);
+			bfile = new File(outputPath + timestamp + PATH_DELIMITER + name + "_" + i + "." + extension);
 			checkIfFileExists(bfile, timestamp, name, extension, i + 1);
 		} else {
 			return bfile;
